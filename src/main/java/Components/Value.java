@@ -1,32 +1,75 @@
 package Components;
 
+import java.util.concurrent.ConcurrentLinkedDeque;
+
 /**
- * Value encapsulates a stored string payload along with an optional expiration timestamp (TTL).
- * If expiryTimestamp is null, the value persists indefinitely until explicitly deleted or overwritten.
+ * Value encapsulates a stored Redis data payload (String or List) along with an optional expiration timestamp (TTL).
  */
 public class Value {
 
-    private final String value;
-    private final Long expiryTimestamp; // Expiry epoch timestamp in milliseconds
+    private final DataType type;
+    private final Object data;
+    private final Long expiryTimestamp;
 
     /**
-     * Constructs a persistent Value without expiration.
+     * Constructs a persistent String Value.
      */
     public Value(String value) {
-        this.value = value;
-        this.expiryTimestamp = null;
+        this(DataType.STRING, value, null);
     }
 
     /**
-     * Constructs a Value with a specific expiration timestamp in epoch milliseconds.
+     * Constructs a String Value with an expiration timestamp.
      */
     public Value(String value, Long expiryTimestamp) {
-        this.value = value;
+        this(DataType.STRING, value, expiryTimestamp);
+    }
+
+    /**
+     * Constructs a persistent List Value.
+     */
+    public Value(ConcurrentLinkedDeque<String> list) {
+        this(DataType.LIST, list, null);
+    }
+
+    /**
+     * Constructs a List Value with an expiration timestamp.
+     */
+    public Value(ConcurrentLinkedDeque<String> list, Long expiryTimestamp) {
+        this(DataType.LIST, list, expiryTimestamp);
+    }
+
+    private Value(DataType type, Object data, Long expiryTimestamp) {
+        this.type = type;
+        this.data = data;
         this.expiryTimestamp = expiryTimestamp;
     }
 
+    public DataType getType() {
+        return type;
+    }
+
+    public boolean isString() {
+        return type == DataType.STRING;
+    }
+
+    public boolean isList() {
+        return type == DataType.LIST;
+    }
+
+    /**
+     * Returns the string payload if type is STRING, otherwise null.
+     */
     public String getValue() {
-        return value;
+        return isString() ? (String) data : null;
+    }
+
+    /**
+     * Returns the concurrent deque list payload if type is LIST, otherwise null.
+     */
+    @SuppressWarnings("unchecked")
+    public ConcurrentLinkedDeque<String> getList() {
+        return isList() ? (ConcurrentLinkedDeque<String>) data : null;
     }
 
     public Long getExpiryTimestamp() {
@@ -35,8 +78,6 @@ public class Value {
 
     /**
      * Checks whether this value has exceeded its expiration timestamp.
-     * 
-     * @return true if an expiration timestamp is set and the current system time is past it.
      */
     public boolean isExpired() {
         return expiryTimestamp != null && System.currentTimeMillis() > expiryTimestamp;

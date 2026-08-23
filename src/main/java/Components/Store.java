@@ -4,15 +4,13 @@ import org.springframework.stereotype.Component;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
- * Store is the in-memory database component managing key-value pairs.
+ * Store is the in-memory database component managing key-value pairs (Strings and Lists).
  * 
- * Thread-Safety: Uses ConcurrentHashMap to allow lock-safe concurrent reads and writes
- * across worker threads processing client sockets.
- * 
- * Key Eviction Strategy: Implements Passive Eviction (Lazy Eviction). When a key is requested via
- * get(), if the key is found but has expired, it is lazily removed from the map and null is returned.
+ * Thread-Safety: Uses ConcurrentHashMap and ConcurrentLinkedDeque to allow lock-safe concurrent
+ * reads and writes across worker client threads.
  */
 @Component
 public class Store {
@@ -24,14 +22,14 @@ public class Store {
     }
 
     /**
-     * Stores a key-value pair without expiration (persistent).
+     * Stores a String key-value pair without expiration (persistent).
      */
     public void set(String key, String value) {
         map.put(key, new Value(value));
     }
 
     /**
-     * Stores a key-value pair with a Time-To-Live (TTL) in milliseconds.
+     * Stores a String key-value pair with a Time-To-Live (TTL) in milliseconds.
      */
     public void set(String key, String value, Long ttlMillis) {
         if (ttlMillis == null || ttlMillis <= 0) {
@@ -40,6 +38,25 @@ public class Store {
             long expiryTimestamp = System.currentTimeMillis() + ttlMillis;
             map.put(key, new Value(value, expiryTimestamp));
         }
+    }
+
+    /**
+     * Creates a new empty List Value at the specified key.
+     * If the key already exists and is a List, returns the existing deque.
+     * If the key exists and is a String (wrong type), returns null.
+     */
+    public ConcurrentLinkedDeque<String> createList(String key) {
+        Value existing = get(key);
+        if (existing != null) {
+            if (!existing.isList()) {
+                return null; // Type mismatch (WRONGTYPE)
+            }
+            return existing.getList();
+        }
+
+        ConcurrentLinkedDeque<String> newList = new ConcurrentLinkedDeque<>();
+        map.put(key, new Value(newList));
+        return newList;
     }
 
     /**
