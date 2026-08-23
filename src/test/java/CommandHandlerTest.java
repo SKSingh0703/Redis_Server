@@ -1,5 +1,6 @@
 import Components.CommandHandler;
 import Components.RespSerializer;
+import Components.Store;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,8 @@ public class CommandHandlerTest {
     @BeforeEach
     public void setUp() {
         RespSerializer respSerializer = new RespSerializer();
-        commandHandler = new CommandHandler(respSerializer);
+        Store store = new Store();
+        commandHandler = new CommandHandler(respSerializer, store);
     }
 
     @Test
@@ -36,9 +38,30 @@ public class CommandHandlerTest {
     }
 
     @Test
-    public void testHandleSetCommandValid() {
-        String response = commandHandler.handleCommand(List.of("SET", "orange", "raspberry"));
-        assertEquals("+OK\r\n", response);
+    public void testHandleSetAndGetCommandValid() {
+        String setResp = commandHandler.handleCommand(List.of("SET", "orange", "raspberry"));
+        assertEquals("+OK\r\n", setResp);
+
+        String getResp = commandHandler.handleCommand(List.of("GET", "orange"));
+        assertEquals("$9\r\nraspberry\r\n", getResp);
+    }
+
+    @Test
+    public void testHandleSetWithPxExpiration() throws InterruptedException {
+        // SET key val PX 100
+        String setResp = commandHandler.handleCommand(List.of("SET", "foo", "bar", "PX", "100"));
+        assertEquals("+OK\r\n", setResp);
+
+        // Immediate GET -> Should return value
+        String getResp1 = commandHandler.handleCommand(List.of("GET", "foo"));
+        assertEquals("$3\r\nbar\r\n", getResp1);
+
+        // Sleep 150ms -> Key should expire
+        Thread.sleep(150);
+
+        // Subsequent GET -> Should return Null Bulk String ($-1\r\n)
+        String getResp2 = commandHandler.handleCommand(List.of("GET", "foo"));
+        assertEquals("$-1\r\n", getResp2);
     }
 
     @Test
@@ -48,8 +71,8 @@ public class CommandHandlerTest {
     }
 
     @Test
-    public void testHandleGetCommandValid() {
-        String response = commandHandler.handleCommand(List.of("GET", "orange"));
+    public void testHandleGetCommandNonExistent() {
+        String response = commandHandler.handleCommand(List.of("GET", "non_existent"));
         assertEquals("$-1\r\n", response);
     }
 
