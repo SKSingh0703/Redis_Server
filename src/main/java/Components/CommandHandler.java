@@ -24,8 +24,8 @@ public class CommandHandler {
     /**
      * Processes a parsed command argument list and returns the RESP serialized response string.
      * 
-     * @param commandParts List of strings where element 0 is the command name (e.g. ["RPUSH", "mylist", "foo", "bar"])
-     * @return RESP formatted wire string (e.g. ":2\r\n", "+OK\r\n", "$-1\r\n", "-ERR ...")
+     * @param commandParts List of strings where element 0 is the command name (e.g. ["LRANGE", "mylist", "0", "-1"])
+     * @return RESP formatted wire string (e.g. "*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", ":2\r\n", "+OK\r\n", "$-1\r\n", "-ERR ...")
      */
     public String handleCommand(List<String> commandParts) {
         if (commandParts == null || commandParts.isEmpty()) {
@@ -114,6 +114,36 @@ public class CommandHandler {
                     return respSerializer.encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
                 }
                 return respSerializer.encodeInteger(lpushLen);
+
+            case "LRANGE":
+                // LRANGE key start stop -> *count\r\n$len\r\nel1\r\n...
+                if (commandParts.size() < 4) {
+                    return respSerializer.encodeError("wrong number of arguments for 'lrange' command");
+                }
+                String lrangeKey = commandParts.get(1);
+                try {
+                    int start = Integer.parseInt(commandParts.get(2));
+                    int stop = Integer.parseInt(commandParts.get(3));
+                    List<String> rangeResult = store.lrange(lrangeKey, start, stop);
+                    if (rangeResult == null) {
+                        return respSerializer.encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+                    }
+                    return respSerializer.encodeArray(rangeResult);
+                } catch (NumberFormatException e) {
+                    return respSerializer.encodeError("value is not an integer or out of range");
+                }
+
+            case "LLEN":
+                // LLEN key -> :length\r\n
+                if (commandParts.size() < 2) {
+                    return respSerializer.encodeError("wrong number of arguments for 'llen' command");
+                }
+                String llenKey = commandParts.get(1);
+                int len = store.llen(llenKey);
+                if (len == -1) {
+                    return respSerializer.encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+                }
+                return respSerializer.encodeInteger(len);
 
             default:
                 return respSerializer.encodeError("unknown command '" + commandParts.get(0) + "'");

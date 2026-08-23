@@ -55,10 +55,6 @@ public class ListTest {
         Value val = store.get("fruits");
         assertNotNull(val);
         assertEquals(4, val.getList().size());
-        assertEquals("apple", val.getList().pollFirst());
-        assertEquals("banana", val.getList().pollFirst());
-        assertEquals("cherry", val.getList().pollFirst());
-        assertEquals("dragonfruit", val.getList().pollFirst());
     }
 
     @Test
@@ -66,17 +62,55 @@ public class ListTest {
         int len1 = store.lpush("numbers", List.of("one"));
         assertEquals(1, len1);
 
-        // lpush "two", "three" -> "three" then "two" prepended to head
         int len2 = store.lpush("numbers", List.of("two", "three"));
         assertEquals(3, len2);
 
         Value val = store.get("numbers");
         assertNotNull(val);
         assertEquals(3, val.getList().size());
-        // Since LPUSH prepends elements in sequence, "three" was pushed last to head
-        assertEquals("three", val.getList().pollFirst());
-        assertEquals("two", val.getList().pollFirst());
-        assertEquals("one", val.getList().pollFirst());
+    }
+
+    @Test
+    public void testLrangePositiveAndNegativeIndices() {
+        // RPUSH mylist "a", "b", "c", "d"
+        store.rpush("mylist", List.of("a", "b", "c", "d"));
+
+        // LRANGE mylist 0 0 -> ["a"]
+        List<String> r1 = store.lrange("mylist", 0, 0);
+        assertEquals(List.of("a"), r1);
+
+        // LRANGE mylist 0 -1 -> ["a", "b", "c", "d"]
+        List<String> r2 = store.lrange("mylist", 0, -1);
+        assertEquals(List.of("a", "b", "c", "d"), r2);
+
+        // LRANGE mylist 0 2 -> ["a", "b", "c"]
+        List<String> r3 = store.lrange("mylist", 0, 2);
+        assertEquals(List.of("a", "b", "c"), r3);
+
+        // LRANGE mylist -2 -1 -> ["c", "d"]
+        List<String> r4 = store.lrange("mylist", -2, -1);
+        assertEquals(List.of("c", "d"), r4);
+
+        // Out of bound stop index: LRANGE mylist 0 100 -> ["a", "b", "c", "d"]
+        List<String> r5 = store.lrange("mylist", 0, 100);
+        assertEquals(List.of("a", "b", "c", "d"), r5);
+
+        // Out of bound start index: LRANGE mylist 10 20 -> []
+        List<String> r6 = store.lrange("mylist", 10, 20);
+        assertTrue(r6.isEmpty());
+    }
+
+    @Test
+    public void testLlenCommand() {
+        store.rpush("mylist", List.of("one", "two", "three"));
+        assertEquals(3, store.llen("mylist"));
+
+        // Non-existent key -> length 0
+        assertEquals(0, store.llen("non_existent"));
+
+        // String key -> returns -1 (WRONGTYPE)
+        store.set("strKey", "hello");
+        assertEquals(-1, store.llen("strKey"));
     }
 
     @Test

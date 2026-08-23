@@ -2,6 +2,8 @@ package Components;
 
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -88,6 +90,78 @@ public class Store {
             list.addFirst(el);
         }
         return list.size();
+    }
+
+    /**
+     * Returns a slice of list elements between start and stop indices (inclusive).
+     * Handles positive indices (0-based) and negative indices (-1 for last element, -2 for 2nd last, etc.).
+     * Returns null if the key exists and is not a List (WRONGTYPE).
+     */
+    public List<String> lrange(String key, int start, int stop) {
+        Value val = get(key);
+        if (val == null) {
+            return Collections.emptyList();
+        }
+        if (!val.isList()) {
+            return null; // Type mismatch (WRONGTYPE)
+        }
+
+        ConcurrentLinkedDeque<String> deque = val.getList();
+        int size = deque.size();
+        if (size == 0) {
+            return Collections.emptyList();
+        }
+
+        // Normalize negative indices
+        if (start < 0) {
+            start = size + start;
+        }
+        if (stop < 0) {
+            stop = size + stop;
+        }
+
+        // Clamp lower bounds
+        if (start < 0) {
+            start = 0;
+        }
+
+        // Clamp upper bounds
+        if (stop >= size) {
+            stop = size - 1;
+        }
+
+        // If start > stop or start >= size, return empty list
+        if (start > stop || start >= size) {
+            return Collections.emptyList();
+        }
+
+        List<String> result = new ArrayList<>();
+        int index = 0;
+        for (String element : deque) {
+            if (index >= start && index <= stop) {
+                result.add(element);
+            }
+            index++;
+            if (index > stop) {
+                break;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns the length of the list at key.
+     * Returns 0 if key does not exist, or -1 if key exists and is not a List.
+     */
+    public int llen(String key) {
+        Value val = get(key);
+        if (val == null) {
+            return 0; // Non-existent key has length 0
+        }
+        if (!val.isList()) {
+            return -1; // Type mismatch (WRONGTYPE)
+        }
+        return val.getList().size();
     }
 
     /**

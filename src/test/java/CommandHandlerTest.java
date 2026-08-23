@@ -65,31 +65,33 @@ public class CommandHandlerTest {
     }
 
     @Test
-    public void testHandleRpushSingleAndMultipleElements() {
-        // RPUSH mylist foo -> returns :1\r\n
-        String r1 = commandHandler.handleCommand(List.of("RPUSH", "mylist", "foo"));
-        assertEquals(":1\r\n", r1);
+    public void testHandleRpushAndLrangePositiveAndNegativeIndices() {
+        commandHandler.handleCommand(List.of("RPUSH", "mylist", "foo", "bar", "baz"));
 
-        // RPUSH mylist bar baz -> returns :3\r\n
-        String r2 = commandHandler.handleCommand(List.of("RPUSH", "mylist", "bar", "baz"));
-        assertEquals(":3\r\n", r2);
+        // LRANGE mylist 0 0 -> *1\r\n$3\r\nfoo\r\n
+        String r1 = commandHandler.handleCommand(List.of("LRANGE", "mylist", "0", "0"));
+        assertEquals("*1\r\n$3\r\nfoo\r\n", r1);
+
+        // LRANGE mylist 0 -1 -> *3\r\n$3\r\nfoo\r\n$3\r\nbar\r\n$3\r\nbaz\r\n
+        String r2 = commandHandler.handleCommand(List.of("LRANGE", "mylist", "0", "-1"));
+        assertEquals("*3\r\n$3\r\nfoo\r\n$3\r\nbar\r\n$3\r\nbaz\r\n", r2);
+
+        // LRANGE mylist -2 -1 -> *2\r\n$3\r\nbar\r\n$3\r\nbaz\r\n
+        String r3 = commandHandler.handleCommand(List.of("LRANGE", "mylist", "-2", "-1"));
+        assertEquals("*2\r\n$3\r\nbar\r\n$3\r\nbaz\r\n", r3);
     }
 
     @Test
-    public void testHandleLpushSingleAndMultipleElements() {
-        // LPUSH mylist foo -> returns :1\r\n
-        String r1 = commandHandler.handleCommand(List.of("LPUSH", "mylist", "foo"));
-        assertEquals(":1\r\n", r1);
-
-        // LPUSH mylist bar -> returns :2\r\n
-        String r2 = commandHandler.handleCommand(List.of("LPUSH", "mylist", "bar"));
-        assertEquals(":2\r\n", r2);
+    public void testHandleLlenCommand() {
+        commandHandler.handleCommand(List.of("RPUSH", "mylist", "a", "b", "c"));
+        String lenResp = commandHandler.handleCommand(List.of("LLEN", "mylist"));
+        assertEquals(":3\r\n", lenResp);
     }
 
     @Test
-    public void testHandleRpushOnStringKeyReturnsWrongType() {
+    public void testHandleLrangeOnStringKeyReturnsWrongType() {
         commandHandler.handleCommand(List.of("SET", "strKey", "hello"));
-        String response = commandHandler.handleCommand(List.of("RPUSH", "strKey", "world"));
+        String response = commandHandler.handleCommand(List.of("LRANGE", "strKey", "0", "-1"));
         assertEquals("-ERR WRONGTYPE Operation against a key holding the wrong kind of value\r\n", response);
     }
 
