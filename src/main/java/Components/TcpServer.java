@@ -4,43 +4,44 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Scanner;
+import java.util.List;
 
 /**
- * Handles TCP networking, socket listening, and client connection management.
- * Spring automatically injects the RespSerializer bean into this component.
+ * Handles TCP networking, socket listening, connection management, and dispatching
+ * client requests to the RespSerializer and CommandHandler.
+ * 
+ * Spring automatically injects RespSerializer and CommandHandler beans into this component.
  */
 @Component
 public class TcpServer {
 
     private final RespSerializer respSerializer;
+    private final CommandHandler commandHandler;
     private final int port = 6379;
 
     @Autowired
-    public TcpServer(RespSerializer respSerializer) {
+    public TcpServer(RespSerializer respSerializer, CommandHandler commandHandler) {
         this.respSerializer = respSerializer;
+        this.commandHandler = commandHandler;
     }
 
     public void startServer() {
         ServerSocket serverSocket = null;
 
         try {
-            // 1. Create server socket bound to port 6379 (ONCE outside the loop)
+            // Bind server socket to port 6379 ONCE
             serverSocket = new ServerSocket(port);
             serverSocket.setReuseAddress(true);
 
             System.out.println("Redis server listening on port " + port + "...");
 
-            // Main Acceptor Loop: Wait for client connections continuously
-            while (true) {
-                // Block and wait until a client connects
+            // Main Acceptor Loop: Accept client connections continuously
+            while (!serverSocket.isClosed()) {
                 Socket clientSocket = serverSocket.accept();
 
-                // Concurrency: Dispatch each client connection to a separate worker thread
+                // Concurrency: Process each client connection on a separate worker thread
                 new Thread(() -> handleClient(clientSocket)).start();
             }
 
@@ -48,7 +49,7 @@ public class TcpServer {
             System.out.println("IOException in TcpServer: " + e.getMessage());
         } finally {
             try {
-                if (serverSocket != null) {
+                if (serverSocket != null && !serverSocket.isClosed()) {
                     serverSocket.close();
                 }
             } catch (IOException e) {
@@ -58,41 +59,31 @@ public class TcpServer {
     }
 
     /**
-     * Handles reading and writing commands for a single client connection.
+     * Handles lifecycle, reading RESP commands, and dispatching responses for a connected client.
      */
     private void handleClient(Socket clientSocket) {
-        try (clientSocket;
-             InputStream inputStream = clientSocket.getInputStream();
-             OutputStream outputStream = clientSocket.getOutputStream()) {
+        try (Client client = new Client(clientSocket)) {
+            System.out.println("Accepted connection from client: " + client.getRemoteAddress());
 
-            System.out.println("Accepted connection from client: " + clientSocket.getRemoteSocketAddress());
+            // Continuously process incoming RESP framed commands while client is connected
+            while (client.isConnected()) {
+                List<String> commandParts = respSerializer.deserialize(client.getInputStream());
 
-            Scanner scanner = new Scanner(inputStream);
+                // Null or empty list indicates client disconnected (EOF) or sent empty frame
+                if (commandParts == null || commandParts.isEmpty()) {
+                    break;
+                }
 
-            // Read incoming commands continuously while connection remains open
-            while (scanner.hasNextLine()) {
-                String line = scanner.nextLine();
+                // Delegate command evaluation to CommandHandler component
+                String response = commandHandler.handleCommand(commandParts);
 
-                // Command: PING
-                if (line.toUpperCase().contains("PING")) {
-                    String pongResponse = respSerializer.encodeSimpleString("PONG");
-                    outputStream.write(pongResponse.getBytes());
-                    outputStream.flush();
-                } 
-                // Command: ECHO <message>
-                else if (line.toUpperCase().contains("ECHO")) {
-                    @SuppressWarnings("unused")
-                    String respHeader = scanner.nextLine(); // Header specifying length (e.g. $3)
-                    String respBody = scanner.nextLine();   // Message payload (e.g. hey)
-
-                    String bulkStringResponse = respSerializer.encodeBulkString(respBody);
-                    outputStream.write(bulkStringResponse.getBytes());
-                    outputStream.flush();
+                // Send RESP wire response back to client
+                if (response != null) {
+                    client.sendResponse(response);
                 }
             }
 
-            System.out.println("Client disconnected cleanly: " + clientSocket.getRemoteSocketAddress());
-            scanner.close();
+            System.out.println("Client disconnected cleanly: " + client.getRemoteAddress());
 
         } catch (IOException e) {
             System.out.println("IOException handling client: " + e.getMessage());
