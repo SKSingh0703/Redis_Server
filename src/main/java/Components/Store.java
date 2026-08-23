@@ -2,6 +2,7 @@ package Components;
 
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -57,6 +58,36 @@ public class Store {
         ConcurrentLinkedDeque<String> newList = new ConcurrentLinkedDeque<>();
         map.put(key, new Value(newList));
         return newList;
+    }
+
+    /**
+     * Appends one or multiple elements to the right (tail) of a list key.
+     * Returns the updated length of the list, or -1 if the key exists and is not a List.
+     */
+    public int rpush(String key, List<String> elements) {
+        ConcurrentLinkedDeque<String> list = createList(key);
+        if (list == null) {
+            return -1; // Type mismatch (WRONGTYPE)
+        }
+        for (String el : elements) {
+            list.addLast(el);
+        }
+        return list.size();
+    }
+
+    /**
+     * Prepends one or multiple elements to the left (head) of a list key.
+     * Returns the updated length of the list, or -1 if the key exists and is not a List.
+     */
+    public int lpush(String key, List<String> elements) {
+        ConcurrentLinkedDeque<String> list = createList(key);
+        if (list == null) {
+            return -1; // Type mismatch (WRONGTYPE)
+        }
+        for (String el : elements) {
+            list.addFirst(el);
+        }
+        return list.size();
     }
 
     /**

@@ -24,8 +24,8 @@ public class CommandHandler {
     /**
      * Processes a parsed command argument list and returns the RESP serialized response string.
      * 
-     * @param commandParts List of strings where element 0 is the command name (e.g. ["SET", "key", "val", "EX", "10"])
-     * @return RESP formatted wire string (e.g. "+OK\r\n", "$5\r\nhello\r\n", "$-1\r\n", "-ERR ...")
+     * @param commandParts List of strings where element 0 is the command name (e.g. ["RPUSH", "mylist", "foo", "bar"])
+     * @return RESP formatted wire string (e.g. ":2\r\n", "+OK\r\n", "$-1\r\n", "-ERR ...")
      */
     public String handleCommand(List<String> commandParts) {
         if (commandParts == null || commandParts.isEmpty()) {
@@ -88,6 +88,32 @@ public class CommandHandler {
                 }
 
                 return respSerializer.encodeBulkString(storedVal.getValue());
+
+            case "RPUSH":
+                // RPUSH key element [element ...] -> :<new_length>\r\n
+                if (commandParts.size() < 3) {
+                    return respSerializer.encodeError("wrong number of arguments for 'rpush' command");
+                }
+                String rpushKey = commandParts.get(1);
+                List<String> rpushElements = commandParts.subList(2, commandParts.size());
+                int rpushLen = store.rpush(rpushKey, rpushElements);
+                if (rpushLen == -1) {
+                    return respSerializer.encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+                }
+                return respSerializer.encodeInteger(rpushLen);
+
+            case "LPUSH":
+                // LPUSH key element [element ...] -> :<new_length>\r\n
+                if (commandParts.size() < 3) {
+                    return respSerializer.encodeError("wrong number of arguments for 'lpush' command");
+                }
+                String lpushKey = commandParts.get(1);
+                List<String> lpushElements = commandParts.subList(2, commandParts.size());
+                int lpushLen = store.lpush(lpushKey, lpushElements);
+                if (lpushLen == -1) {
+                    return respSerializer.encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+                }
+                return respSerializer.encodeInteger(lpushLen);
 
             default:
                 return respSerializer.encodeError("unknown command '" + commandParts.get(0) + "'");

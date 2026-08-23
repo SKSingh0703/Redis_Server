@@ -65,6 +65,35 @@ public class CommandHandlerTest {
     }
 
     @Test
+    public void testHandleRpushSingleAndMultipleElements() {
+        // RPUSH mylist foo -> returns :1\r\n
+        String r1 = commandHandler.handleCommand(List.of("RPUSH", "mylist", "foo"));
+        assertEquals(":1\r\n", r1);
+
+        // RPUSH mylist bar baz -> returns :3\r\n
+        String r2 = commandHandler.handleCommand(List.of("RPUSH", "mylist", "bar", "baz"));
+        assertEquals(":3\r\n", r2);
+    }
+
+    @Test
+    public void testHandleLpushSingleAndMultipleElements() {
+        // LPUSH mylist foo -> returns :1\r\n
+        String r1 = commandHandler.handleCommand(List.of("LPUSH", "mylist", "foo"));
+        assertEquals(":1\r\n", r1);
+
+        // LPUSH mylist bar -> returns :2\r\n
+        String r2 = commandHandler.handleCommand(List.of("LPUSH", "mylist", "bar"));
+        assertEquals(":2\r\n", r2);
+    }
+
+    @Test
+    public void testHandleRpushOnStringKeyReturnsWrongType() {
+        commandHandler.handleCommand(List.of("SET", "strKey", "hello"));
+        String response = commandHandler.handleCommand(List.of("RPUSH", "strKey", "world"));
+        assertEquals("-ERR WRONGTYPE Operation against a key holding the wrong kind of value\r\n", response);
+    }
+
+    @Test
     public void testHandleSetCommandMissingArgs() {
         String response = commandHandler.handleCommand(List.of("SET", "orange"));
         assertEquals("-ERR wrong number of arguments for 'set' command\r\n", response);
