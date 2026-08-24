@@ -82,6 +82,27 @@ public class CommandHandlerTest {
     }
 
     @Test
+    public void testHandleLpopSingleAndMultipleElements() {
+        commandHandler.handleCommand(List.of("RPUSH", "mylist", "one", "two", "three"));
+
+        // LPOP mylist (single element) -> returns Bulk String $3\r\none\r\n
+        String r1 = commandHandler.handleCommand(List.of("LPOP", "mylist"));
+        assertEquals("$3\r\none\r\n", r1);
+
+        // LPOP mylist 2 (multiple elements) -> returns Array *2\r\n$3\r\ntwo\r\n$5\r\nthree\r\n
+        String r2 = commandHandler.handleCommand(List.of("LPOP", "mylist", "2"));
+        assertEquals("*2\r\n$3\r\ntwo\r\n$5\r\nthree\r\n", r2);
+
+        // LPOP mylist on now-empty key -> returns Null Bulk String $-1\r\n
+        String r3 = commandHandler.handleCommand(List.of("LPOP", "mylist"));
+        assertEquals("$-1\r\n", r3);
+
+        // LPOP mylist 2 on now-empty key -> returns Null Array *-1\r\n
+        String r4 = commandHandler.handleCommand(List.of("LPOP", "mylist", "2"));
+        assertEquals("*-1\r\n", r4);
+    }
+
+    @Test
     public void testHandleLlenCommand() {
         commandHandler.handleCommand(List.of("RPUSH", "mylist", "a", "b", "c"));
         String lenResp = commandHandler.handleCommand(List.of("LLEN", "mylist"));

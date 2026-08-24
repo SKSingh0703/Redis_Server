@@ -72,30 +72,23 @@ public class ListTest {
 
     @Test
     public void testLrangePositiveAndNegativeIndices() {
-        // RPUSH mylist "a", "b", "c", "d"
         store.rpush("mylist", List.of("a", "b", "c", "d"));
 
-        // LRANGE mylist 0 0 -> ["a"]
         List<String> r1 = store.lrange("mylist", 0, 0);
         assertEquals(List.of("a"), r1);
 
-        // LRANGE mylist 0 -1 -> ["a", "b", "c", "d"]
         List<String> r2 = store.lrange("mylist", 0, -1);
         assertEquals(List.of("a", "b", "c", "d"), r2);
 
-        // LRANGE mylist 0 2 -> ["a", "b", "c"]
         List<String> r3 = store.lrange("mylist", 0, 2);
         assertEquals(List.of("a", "b", "c"), r3);
 
-        // LRANGE mylist -2 -1 -> ["c", "d"]
         List<String> r4 = store.lrange("mylist", -2, -1);
         assertEquals(List.of("c", "d"), r4);
 
-        // Out of bound stop index: LRANGE mylist 0 100 -> ["a", "b", "c", "d"]
         List<String> r5 = store.lrange("mylist", 0, 100);
         assertEquals(List.of("a", "b", "c", "d"), r5);
 
-        // Out of bound start index: LRANGE mylist 10 20 -> []
         List<String> r6 = store.lrange("mylist", 10, 20);
         assertTrue(r6.isEmpty());
     }
@@ -105,12 +98,45 @@ public class ListTest {
         store.rpush("mylist", List.of("one", "two", "three"));
         assertEquals(3, store.llen("mylist"));
 
-        // Non-existent key -> length 0
         assertEquals(0, store.llen("non_existent"));
 
-        // String key -> returns -1 (WRONGTYPE)
         store.set("strKey", "hello");
         assertEquals(-1, store.llen("strKey"));
+    }
+
+    @Test
+    public void testLpopSingleAndMultipleElementsWithKeyEviction() {
+        store.rpush("mylist", List.of("a", "b", "c", "d"));
+
+        // LPOP 1 element -> returns ["a"]
+        List<String> popped1 = store.lpop("mylist", 1);
+        assertEquals(List.of("a"), popped1);
+
+        // LPOP 2 elements -> returns ["b", "c"]
+        List<String> popped2 = store.lpop("mylist", 2);
+        assertEquals(List.of("b", "c"), popped2);
+
+        // LPOP last element -> returns ["d"] and key is automatically evicted from store
+        List<String> popped3 = store.lpop("mylist", 1);
+        assertEquals(List.of("d"), popped3);
+
+        // Key should now be completely deleted from store
+        assertNull(store.get("mylist"));
+    }
+
+    @Test
+    public void testRpopSingleAndMultipleElementsWithKeyEviction() {
+        store.rpush("mylist", List.of("a", "b", "c", "d"));
+
+        // RPOP 1 element -> returns ["d"]
+        List<String> popped1 = store.rpop("mylist", 1);
+        assertEquals(List.of("d"), popped1);
+
+        // RPOP 3 elements -> returns ["c", "b", "a"] (in order popped from tail) and key is automatically evicted
+        List<String> popped2 = store.rpop("mylist", 3);
+        assertEquals(List.of("c", "b", "a"), popped2);
+
+        assertNull(store.get("mylist"));
     }
 
     @Test

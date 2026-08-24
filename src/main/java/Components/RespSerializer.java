@@ -90,6 +90,14 @@ public class RespSerializer {
         return sb.toString();
     }
 
+    /**
+     * Formats a Null Array (*-1\r\n).
+     * Used when an array command targets a non-existent key.
+     */
+    public String encodeNullArray() {
+        return "*-1\r\n";
+    }
+
     // ==========================================
     // DESERIALIZATION (PARSING) METHODS
     // ==========================================

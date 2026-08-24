@@ -24,8 +24,8 @@ public class CommandHandler {
     /**
      * Processes a parsed command argument list and returns the RESP serialized response string.
      * 
-     * @param commandParts List of strings where element 0 is the command name (e.g. ["LRANGE", "mylist", "0", "-1"])
-     * @return RESP formatted wire string (e.g. "*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", ":2\r\n", "+OK\r\n", "$-1\r\n", "-ERR ...")
+     * @param commandParts List of strings where element 0 is the command name (e.g. ["LPOP", "mylist", "2"])
+     * @return RESP formatted wire string (e.g. "$3\r\nfoo\r\n", "*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", "$-1\r\n", "-ERR ...")
      */
     public String handleCommand(List<String> commandParts) {
         if (commandParts == null || commandParts.isEmpty()) {
@@ -144,6 +144,76 @@ public class CommandHandler {
                     return respSerializer.encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
                 }
                 return respSerializer.encodeInteger(len);
+
+            case "LPOP":
+                // LPOP key [count]
+                if (commandParts.size() < 2) {
+                    return respSerializer.encodeError("wrong number of arguments for 'lpop' command");
+                }
+                String lpopKey = commandParts.get(1);
+                int lpopCount = 1;
+                boolean lpopHasCount = commandParts.size() >= 3;
+                if (lpopHasCount) {
+                    try {
+                        lpopCount = Integer.parseInt(commandParts.get(2));
+                    } catch (NumberFormatException e) {
+                        return respSerializer.encodeError("value is not an integer or out of range");
+                    }
+                }
+
+                List<String> lpopped = store.lpop(lpopKey, lpopCount);
+                if (lpopped == null) {
+                    return respSerializer.encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+                }
+
+                if (!lpopHasCount) {
+                    // Single element LPOP -> Bulk String ($len\r\nmsg\r\n) or Null Bulk String ($-1\r\n)
+                    if (lpopped.isEmpty()) {
+                        return respSerializer.encodeNullBulkString();
+                    }
+                    return respSerializer.encodeBulkString(lpopped.get(0));
+                } else {
+                    // Multi-element LPOP -> Array (*count\r\n...) or Null Array (*-1\r\n)
+                    if (lpopped.isEmpty()) {
+                        return respSerializer.encodeNullArray();
+                    }
+                    return respSerializer.encodeArray(lpopped);
+                }
+
+            case "RPOP":
+                // RPOP key [count]
+                if (commandParts.size() < 2) {
+                    return respSerializer.encodeError("wrong number of arguments for 'rpop' command");
+                }
+                String rpopKey = commandParts.get(1);
+                int rpopCount = 1;
+                boolean rpopHasCount = commandParts.size() >= 3;
+                if (rpopHasCount) {
+                    try {
+                        rpopCount = Integer.parseInt(commandParts.get(2));
+                    } catch (NumberFormatException e) {
+                        return respSerializer.encodeError("value is not an integer or out of range");
+                    }
+                }
+
+                List<String> rpopped = store.rpop(rpopKey, rpopCount);
+                if (rpopped == null) {
+                    return respSerializer.encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+                }
+
+                if (!rpopHasCount) {
+                    // Single element RPOP -> Bulk String ($len\r\nmsg\r\n) or Null Bulk String ($-1\r\n)
+                    if (rpopped.isEmpty()) {
+                        return respSerializer.encodeNullBulkString();
+                    }
+                    return respSerializer.encodeBulkString(rpopped.get(0));
+                } else {
+                    // Multi-element RPOP -> Array (*count\r\n...) or Null Array (*-1\r\n)
+                    if (rpopped.isEmpty()) {
+                        return respSerializer.encodeNullArray();
+                    }
+                    return respSerializer.encodeArray(rpopped);
+                }
 
             default:
                 return respSerializer.encodeError("unknown command '" + commandParts.get(0) + "'");

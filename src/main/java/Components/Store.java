@@ -165,6 +165,80 @@ public class Store {
     }
 
     /**
+     * Removes and returns up to count elements from the left (head) of a list key.
+     * Automatically deletes the key if the list becomes empty.
+     * Returns null if key exists and is not a List (WRONGTYPE).
+     */
+    public List<String> lpop(String key, int count) {
+        Value val = get(key);
+        if (val == null) {
+            return Collections.emptyList();
+        }
+        if (!val.isList()) {
+            return null; // Type mismatch (WRONGTYPE)
+        }
+
+        ConcurrentLinkedDeque<String> deque = val.getList();
+        if (deque.isEmpty()) {
+            delete(key);
+            return Collections.emptyList();
+        }
+
+        List<String> popped = new ArrayList<>();
+        int toPop = Math.min(count, deque.size());
+        for (int i = 0; i < toPop; i++) {
+            String el = deque.pollFirst();
+            if (el != null) {
+                popped.add(el);
+            }
+        }
+
+        // Automatic key deletion when list becomes empty
+        if (deque.isEmpty()) {
+            delete(key);
+        }
+
+        return popped;
+    }
+
+    /**
+     * Removes and returns up to count elements from the right (tail) of a list key.
+     * Automatically deletes the key if the list becomes empty.
+     * Returns null if key exists and is not a List (WRONGTYPE).
+     */
+    public List<String> rpop(String key, int count) {
+        Value val = get(key);
+        if (val == null) {
+            return Collections.emptyList();
+        }
+        if (!val.isList()) {
+            return null; // Type mismatch (WRONGTYPE)
+        }
+
+        ConcurrentLinkedDeque<String> deque = val.getList();
+        if (deque.isEmpty()) {
+            delete(key);
+            return Collections.emptyList();
+        }
+
+        List<String> popped = new ArrayList<>();
+        int toPop = Math.min(count, deque.size());
+        for (int i = 0; i < toPop; i++) {
+            String el = deque.pollLast();
+            if (el != null) {
+                popped.add(el);
+            }
+        }
+
+        // Automatic key deletion when list becomes empty
+        if (deque.isEmpty()) {
+            delete(key);
+        }
+
+        return popped;
+    }
+
+    /**
      * Retrieves a Value by key.
      * Performs passive (lazy) expiration check: if key is expired, it is evicted on read and returns null.
      */
