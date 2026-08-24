@@ -12,16 +12,32 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 /**
  * Store is the in-memory database component managing key-value pairs (Strings and Lists).
  * 
- * Thread-Safety: Uses ConcurrentHashMap and ConcurrentLinkedDeque to allow lock-safe concurrent
- * reads and writes across worker client threads.
+ * Thread-Safety & Blocking: Uses ConcurrentHashMap, ConcurrentLinkedDeque, and per-key Monitor locks
+ * to support lock-safe concurrent reads/writes and Producer-Consumer blocking retrievals (BLPOP/BRPOP).
  */
 @Component
 public class Store {
 
     private final ConcurrentHashMap<String, Value> map;
+    // Lock for each key to support blocking operations and prevent multiple threads from accessing the same key
+    private final ConcurrentHashMap<String, Object> keyLocks;
 
     public Store() {
         this.map = new ConcurrentHashMap<>();
+        this.keyLocks = new ConcurrentHashMap<>();
+    }
+
+    private Object getKeyLock(String key) {
+        return keyLocks.computeIfAbsent(key, k -> new Object());
+    }
+
+    private void notifyKey(String key) {
+        Object lock = keyLocks.get(key);
+        if (lock != null) {
+            synchronized (lock) {
+                lock.notifyAll();
+            }
+        }
     }
 
     /**
@@ -29,6 +45,7 @@ public class Store {
      */
     public void set(String key, String value) {
         map.put(key, new Value(value));
+        notifyKey(key);
     }
 
     /**
@@ -40,6 +57,7 @@ public class Store {
         } else {
             long expiryTimestamp = System.currentTimeMillis() + ttlMillis;
             map.put(key, new Value(value, expiryTimestamp));
+            notifyKey(key);
         }
     }
 
@@ -64,6 +82,7 @@ public class Store {
 
     /**
      * Appends one or multiple elements to the right (tail) of a list key.
+     * Notifies any waiting BLPOP/BRPOP threads.
      * Returns the updated length of the list, or -1 if the key exists and is not a List.
      */
     public int rpush(String key, List<String> elements) {
@@ -74,11 +93,13 @@ public class Store {
         for (String el : elements) {
             list.addLast(el);
         }
+        notifyKey(key);
         return list.size();
     }
 
     /**
      * Prepends one or multiple elements to the left (head) of a list key.
+     * Notifies any waiting BLPOP/BRPOP threads.
      * Returns the updated length of the list, or -1 if the key exists and is not a List.
      */
     public int lpush(String key, List<String> elements) {
@@ -89,6 +110,7 @@ public class Store {
         for (String el : elements) {
             list.addFirst(el);
         }
+        notifyKey(key);
         return list.size();
     }
 
@@ -236,6 +258,94 @@ public class Store {
         }
 
         return popped;
+    }
+
+    /**
+     * Blocking Left Pop: Removes and gets the first element from one of the specified keys.
+     * Blocks if all keys are empty until an element is pushed or timeout (in seconds) expires.
+     * If timeout is 0, blocks indefinitely.
+     * Returns a 2-element list [keyName, poppedElement], or null if timed out.
+     */
+    public List<String> blpop(List<String> keys, double timeoutSeconds) {
+        long timeoutMs = (long) (timeoutSeconds * 1000L);
+        boolean indefinite = (timeoutSeconds == 0);
+        long deadline = indefinite ? Long.MAX_VALUE : System.currentTimeMillis() + timeoutMs;
+
+        while (true) {
+            // 1. Immediate non-blocking check across all target keys
+            for (String key : keys) {
+                List<String> popped = lpop(key, 1);
+                if (popped != null && !popped.isEmpty()) {
+                    return List.of(key, popped.get(0));
+                }
+            }
+
+            // 2. Timeout check
+            long remaining = deadline - System.currentTimeMillis();
+            if (!indefinite && remaining <= 0) {
+                return null; // Timed out
+            }
+
+            // 3. Wait on key lock monitors
+            for (String key : keys) {
+                Object lock = getKeyLock(key);
+                synchronized (lock) {
+                    try {
+                        long waitTime = indefinite ? 100L : Math.min(remaining, 100L);
+                        if (waitTime > 0) {
+                            lock.wait(waitTime);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return null;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Blocking Right Pop: Removes and gets the last element from one of the specified keys.
+     * Blocks if all keys are empty until an element is pushed or timeout (in seconds) expires.
+     * If timeout is 0, blocks indefinitely.
+     * Returns a 2-element list [keyName, poppedElement], or null if timed out.
+     */
+    public List<String> brpop(List<String> keys, double timeoutSeconds) {
+        long timeoutMs = (long) (timeoutSeconds * 1000L);
+        boolean indefinite = (timeoutSeconds == 0);
+        long deadline = indefinite ? Long.MAX_VALUE : System.currentTimeMillis() + timeoutMs;
+
+        while (true) {
+            // 1. Immediate non-blocking check across all target keys
+            for (String key : keys) {
+                List<String> popped = rpop(key, 1);
+                if (popped != null && !popped.isEmpty()) {
+                    return List.of(key, popped.get(0));
+                }
+            }
+
+            // 2. Timeout check
+            long remaining = deadline - System.currentTimeMillis();
+            if (!indefinite && remaining <= 0) {
+                return null; // Timed out
+            }
+
+            // 3. Wait on key lock monitors
+            for (String key : keys) {
+                Object lock = getKeyLock(key);
+                synchronized (lock) {
+                    try {
+                        long waitTime = indefinite ? 100L : Math.min(remaining, 100L);
+                        if (waitTime > 0) {
+                            lock.wait(waitTime);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return null;
+                    }
+                }
+            }
+        }
     }
 
     /**

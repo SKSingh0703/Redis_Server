@@ -24,8 +24,8 @@ public class CommandHandler {
     /**
      * Processes a parsed command argument list and returns the RESP serialized response string.
      * 
-     * @param commandParts List of strings where element 0 is the command name (e.g. ["LPOP", "mylist", "2"])
-     * @return RESP formatted wire string (e.g. "$3\r\nfoo\r\n", "*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", "$-1\r\n", "-ERR ...")
+     * @param commandParts List of strings where element 0 is the command name (e.g. ["BLPOP", "mylist", "1"])
+     * @return RESP formatted wire string (e.g. "*2\r\n$6\r\nmylist\r\n$3\r\nfoo\r\n", "*-1\r\n", ":2\r\n", "+OK\r\n", "$-1\r\n", "-ERR ...")
      */
     public String handleCommand(List<String> commandParts) {
         if (commandParts == null || commandParts.isEmpty()) {
@@ -167,13 +167,11 @@ public class CommandHandler {
                 }
 
                 if (!lpopHasCount) {
-                    // Single element LPOP -> Bulk String ($len\r\nmsg\r\n) or Null Bulk String ($-1\r\n)
                     if (lpopped.isEmpty()) {
                         return respSerializer.encodeNullBulkString();
                     }
                     return respSerializer.encodeBulkString(lpopped.get(0));
                 } else {
-                    // Multi-element LPOP -> Array (*count\r\n...) or Null Array (*-1\r\n)
                     if (lpopped.isEmpty()) {
                         return respSerializer.encodeNullArray();
                     }
@@ -202,17 +200,49 @@ public class CommandHandler {
                 }
 
                 if (!rpopHasCount) {
-                    // Single element RPOP -> Bulk String ($len\r\nmsg\r\n) or Null Bulk String ($-1\r\n)
                     if (rpopped.isEmpty()) {
                         return respSerializer.encodeNullBulkString();
                     }
                     return respSerializer.encodeBulkString(rpopped.get(0));
                 } else {
-                    // Multi-element RPOP -> Array (*count\r\n...) or Null Array (*-1\r\n)
                     if (rpopped.isEmpty()) {
                         return respSerializer.encodeNullArray();
                     }
                     return respSerializer.encodeArray(rpopped);
+                }
+
+            case "BLPOP":
+                // BLPOP key [key ...] timeout -> *2\r\n$keyLen\r\nkey\r\n$valLen\r\nval\r\n or *-1\r\n
+                if (commandParts.size() < 3) {
+                    return respSerializer.encodeError("wrong number of arguments for 'blpop' command");
+                }
+                List<String> blpopKeys = commandParts.subList(1, commandParts.size() - 1);
+                try {
+                    double blpopTimeout = Double.parseDouble(commandParts.get(commandParts.size() - 1));
+                    List<String> blpopResult = store.blpop(blpopKeys, blpopTimeout);
+                    if (blpopResult == null) {
+                        return respSerializer.encodeNullArray(); // Timed out (null array)
+                    }
+                    return respSerializer.encodeArray(blpopResult);
+                } catch (NumberFormatException e) {
+                    return respSerializer.encodeError("timeout is not a float or integer");
+                }
+
+            case "BRPOP":
+                // BRPOP key [key ...] timeout -> *2\r\n$keyLen\r\nkey\r\n$valLen\r\nval\r\n or *-1\r\n
+                if (commandParts.size() < 3) {
+                    return respSerializer.encodeError("wrong number of arguments for 'brpop' command");
+                }
+                List<String> brpopKeys = commandParts.subList(1, commandParts.size() - 1);
+                try {
+                    double brpopTimeout = Double.parseDouble(commandParts.get(commandParts.size() - 1));
+                    List<String> brpopResult = store.brpop(brpopKeys, brpopTimeout);
+                    if (brpopResult == null) {
+                        return respSerializer.encodeNullArray(); // Timed out (null array)
+                    }
+                    return respSerializer.encodeArray(brpopResult);
+                } catch (NumberFormatException e) {
+                    return respSerializer.encodeError("timeout is not a float or integer");
                 }
 
             default:
