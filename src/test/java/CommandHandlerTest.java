@@ -1,6 +1,6 @@
-import Components.CommandHandler;
-import Components.RespSerializer;
-import Components.Store;
+import Components.Repository.Store;
+import Components.Server.RespSerializer;
+import Components.Service.CommandHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

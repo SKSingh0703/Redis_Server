@@ -1,4 +1,4 @@
-import Components.RespSerializer;
+import Components.Server.RespSerializer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -51,7 +51,6 @@ public class RespSerializerTest {
 
     @Test
     public void testDeserializeRespArraySetCommand() throws IOException {
-        // Equivalent to redis-cli SET orange raspberry
         String rawInput = "*3\r\n$3\r\nSET\r\n$6\r\norange\r\n$9\r\nraspberry\r\n";
         InputStream in = new ByteArrayInputStream(rawInput.getBytes(StandardCharsets.UTF_8));
 

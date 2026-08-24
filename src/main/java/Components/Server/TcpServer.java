@@ -1,5 +1,9 @@
-package Components;
+package Components.Server;
 
+import Components.Service.CommandHandler;
+import Infra.Client;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -11,15 +15,18 @@ import java.util.List;
 /**
  * Handles TCP networking, socket listening, connection management, and dispatching
  * client requests to the RespSerializer and CommandHandler.
+ * Located in package Components.Server.
  * 
  * Spring automatically injects RespSerializer and CommandHandler beans into this component.
  */
 @Component
 public class TcpServer {
 
+    private static final Logger logger = LoggerFactory.getLogger(TcpServer.class);
+
     private final RespSerializer respSerializer;
     private final CommandHandler commandHandler;
-    private final int port = 6379;
+    private static final int DEFAULT_PORT = 6379;
 
     @Autowired
     public TcpServer(RespSerializer respSerializer, CommandHandler commandHandler) {
@@ -27,15 +34,27 @@ public class TcpServer {
         this.commandHandler = commandHandler;
     }
 
+    /**
+     * Starts the TCP server listening on the default port 6379.
+     */
     public void startServer() {
+        startServer(DEFAULT_PORT);
+    }
+
+    /**
+     * Starts the TCP server listening on the specified port.
+     * 
+     * @param port the port number to bind the ServerSocket to (e.g. 6379, 6380)
+     */
+    public void startServer(int port) {
         ServerSocket serverSocket = null;
 
         try {
-            // Bind server socket to port 6379 ONCE
+            // Bind server socket to the specified port
             serverSocket = new ServerSocket(port);
             serverSocket.setReuseAddress(true);
 
-            System.out.println("Redis server listening on port " + port + "...");
+            logger.info("Redis server listening on port {}...", port);
 
             // Main Acceptor Loop: Accept client connections continuously
             while (!serverSocket.isClosed()) {
@@ -46,14 +65,14 @@ public class TcpServer {
             }
 
         } catch (IOException e) {
-            System.out.println("IOException in TcpServer: " + e.getMessage());
+            logger.error("IOException in TcpServer on port {}: {}", port, e.getMessage());
         } finally {
             try {
                 if (serverSocket != null && !serverSocket.isClosed()) {
                     serverSocket.close();
                 }
             } catch (IOException e) {
-                System.out.println("IOException when closing server socket: " + e.getMessage());
+                logger.error("IOException when closing server socket: {}", e.getMessage());
             }
         }
     }
@@ -63,7 +82,7 @@ public class TcpServer {
      */
     private void handleClient(Socket clientSocket) {
         try (Client client = new Client(clientSocket)) {
-            System.out.println("Accepted connection from client: " + client.getRemoteAddress());
+            logger.info("Accepted connection from client: {}", client.getRemoteAddress());
 
             // Continuously process incoming RESP framed commands while client is connected
             while (client.isConnected()) {
@@ -83,10 +102,10 @@ public class TcpServer {
                 }
             }
 
-            System.out.println("Client disconnected cleanly: " + client.getRemoteAddress());
+            logger.info("Client disconnected cleanly: {}", client.getRemoteAddress());
 
         } catch (IOException e) {
-            System.out.println("IOException handling client: " + e.getMessage());
+            logger.error("IOException handling client: {}", e.getMessage());
         }
     }
 }

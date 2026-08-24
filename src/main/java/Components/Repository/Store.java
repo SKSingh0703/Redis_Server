@@ -1,5 +1,7 @@
-package Components;
+package Components.Repository;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -10,13 +12,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
- * Store is the in-memory database component managing key-value pairs (Strings and Lists).
+ * Store is the in-memory repository component managing key-value pairs (Strings and Lists).
+ * Located in package Components.Repository.
  * 
  * Thread-Safety & Blocking: Uses ConcurrentHashMap, ConcurrentLinkedDeque, and per-key Monitor locks
  * to support lock-safe concurrent reads/writes and Producer-Consumer blocking retrievals (BLPOP/BRPOP).
  */
 @Component
 public class Store {
+
+    private static final Logger logger = LoggerFactory.getLogger(Store.class);
 
     private final ConcurrentHashMap<String, Value> map;
     // Lock for each key to support blocking operations and prevent multiple threads from accessing the same key
@@ -360,6 +365,7 @@ public class Store {
 
         // Passive Expiration Check
         if (val.isExpired()) {
+            logger.debug("Passive eviction triggered for expired key: {}", key);
             map.remove(key); // Evict expired key lazily
             return null;
         }

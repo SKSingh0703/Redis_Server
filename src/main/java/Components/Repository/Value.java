@@ -1,9 +1,10 @@
-package Components;
+package Components.Repository;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Value encapsulates a stored Redis data payload (String or List) along with an optional expiration timestamp (TTL).
+ * Located in package Components.Repository.
  */
 public class Value {
 

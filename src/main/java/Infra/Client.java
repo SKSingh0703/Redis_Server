@@ -1,4 +1,7 @@
-package Components;
+package Infra;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -7,11 +10,12 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Client encapsulates a single connected TCP client socket.
- * It abstracts low-level stream reading and writing, provides helper methods
- * for sending RESP formatted responses, and manages connection state and resource cleanup.
+ * Client encapsulates a single connected TCP client socket and its streaming I/O lifecycle.
+ * Located in package Infra to prepare for storing node replication metadata and client session lists.
  */
 public class Client implements AutoCloseable {
+
+    private static final Logger logger = LoggerFactory.getLogger(Client.class);
 
     private final Socket socket;
     private final InputStream inputStream;
@@ -80,7 +84,7 @@ public class Client implements AutoCloseable {
                 socket.close();
             }
         } catch (IOException e) {
-            System.err.println("Error closing client connection [" + remoteAddress + "]: " + e.getMessage());
+            logger.error("Error closing client connection [{}]: {}", remoteAddress, e.getMessage());
         }
     }
 }

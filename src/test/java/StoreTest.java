@@ -1,5 +1,5 @@
-import Components.Store;
-import Components.Value;
+import Components.Repository.Store;
+import Components.Repository.Value;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,18 +42,14 @@ public class StoreTest {
 
     @Test
     public void testKeyExpirationWithTTL() throws InterruptedException {
-        // Set key with 100ms TTL
         store.set("tempKey", "tempVal", 100L);
 
-        // Key should exist immediately
         Value activeVal = store.get("tempKey");
         assertNotNull(activeVal);
         assertEquals("tempVal", activeVal.getValue());
 
-        // Wait 150ms for expiration
         Thread.sleep(150);
 
-        // Key should be expired and lazily evicted on get()
         Value expiredVal = store.get("tempKey");
         assertNull(expiredVal);
     }

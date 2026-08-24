@@ -1,6 +1,6 @@
-import Components.DataType;
-import Components.Store;
-import Components.Value;
+import Components.Repository.DataType;
+import Components.Repository.Store;
+import Components.Repository.Value;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -108,19 +108,15 @@ public class ListTest {
     public void testLpopSingleAndMultipleElementsWithKeyEviction() {
         store.rpush("mylist", List.of("a", "b", "c", "d"));
 
-        // LPOP 1 element -> returns ["a"]
         List<String> popped1 = store.lpop("mylist", 1);
         assertEquals(List.of("a"), popped1);
 
-        // LPOP 2 elements -> returns ["b", "c"]
         List<String> popped2 = store.lpop("mylist", 2);
         assertEquals(List.of("b", "c"), popped2);
 
-        // LPOP last element -> returns ["d"] and key is automatically evicted from store
         List<String> popped3 = store.lpop("mylist", 1);
         assertEquals(List.of("d"), popped3);
 
-        // Key should now be completely deleted from store
         assertNull(store.get("mylist"));
     }
 
@@ -128,11 +124,9 @@ public class ListTest {
     public void testRpopSingleAndMultipleElementsWithKeyEviction() {
         store.rpush("mylist", List.of("a", "b", "c", "d"));
 
-        // RPOP 1 element -> returns ["d"]
         List<String> popped1 = store.rpop("mylist", 1);
         assertEquals(List.of("d"), popped1);
 
-        // RPOP 3 elements -> returns ["c", "b", "a"] (in order popped from tail) and key is automatically evicted
         List<String> popped2 = store.rpop("mylist", 3);
         assertEquals(List.of("c", "b", "a"), popped2);
 

@@ -1,12 +1,15 @@
+package Config;
+
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * AppConfig serves as the Spring Java-based configuration class.
  * @Configuration tells Spring this is a configuration source.
- * @ComponentScan tells Spring to automatically discover and register @Component classes in the "Components" package.
+ * @ComponentScan tells Spring to automatically discover and register @Component classes
+ * across Components, Infra, and Config packages.
  */
 @Configuration
-@ComponentScan(basePackages = {"Components"})
+@ComponentScan(basePackages = {"Components", "Infra", "Config"})
 public class AppConfig {
 }

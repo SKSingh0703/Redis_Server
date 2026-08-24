@@ -1,5 +1,8 @@
-package Components;
+package Components.Service;
 
+import Components.Repository.Store;
+import Components.Repository.Value;
+import Components.Server.RespSerializer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -7,7 +10,8 @@ import java.util.List;
 
 /**
  * CommandHandler evaluates parsed Redis commands and delegates data persistence
- * to the thread-safe Store component.
+ * to the thread-safe Store repository component.
+ * Located in package Components.Service.
  */
 @Component
 public class CommandHandler {
@@ -221,7 +225,7 @@ public class CommandHandler {
                     double blpopTimeout = Double.parseDouble(commandParts.get(commandParts.size() - 1));
                     List<String> blpopResult = store.blpop(blpopKeys, blpopTimeout);
                     if (blpopResult == null) {
-                        return respSerializer.encodeNullArray(); // Timed out (null array)
+                        return respSerializer.encodeNullArray();
                     }
                     return respSerializer.encodeArray(blpopResult);
                 } catch (NumberFormatException e) {
@@ -238,7 +242,7 @@ public class CommandHandler {
                     double brpopTimeout = Double.parseDouble(commandParts.get(commandParts.size() - 1));
                     List<String> brpopResult = store.brpop(brpopKeys, brpopTimeout);
                     if (brpopResult == null) {
-                        return respSerializer.encodeNullArray(); // Timed out (null array)
+                        return respSerializer.encodeNullArray();
                     }
                     return respSerializer.encodeArray(brpopResult);
                 } catch (NumberFormatException e) {

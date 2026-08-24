@@ -1,4 +1,4 @@
-package Components;
+package Components.Server;
 
 import org.springframework.stereotype.Component;
 
@@ -14,6 +14,7 @@ import java.util.List;
 /**
  * RespSerializer is responsible for encoding Java objects into Redis Serialization Protocol (RESP) strings
  * and decoding (parsing) incoming RESP byte streams into structured Redis command parameter lists.
+ * Located in package Components.Server.
  * 
  * Protocol Types (RESP2 / RESP3):
  *  '+' -> Simple Strings (non binary-safe string + \r\n)
